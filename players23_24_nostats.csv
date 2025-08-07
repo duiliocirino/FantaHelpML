@@ -20,7 +20,7 @@ id,role,name,squad,price,myRating,mate,regularness,fvm,expMf,expPrice,expStd
 22,C,De Roon,Atalanta,8,3.2,,5,16,5.95,1,5
 4947,C,Brescianini,Atalanta,7,3.8,,4,33,6.44,14,5
 6024,C,Sulemana I.,Atalanta,2,3.2,,2,4,6.4,1,4
-2137,A,Scamacca,Atalanta,27,4.3,,3,145,8.01,84,17
+2137,A,Scamacca,Atalanta,27,4.3,,2,145,8.01,84,17
 4730,A,Lookman,Atalanta,27,4.2,,5,222,7.65,142,23
 6228,A,Retegui,Atalanta,22,3.9,,5,194,7.04,121,21
 5995,A,De Ketelaere,Atalanta,21,4.1,,5,147,7.64,86,17
@@ -38,7 +38,7 @@ id,role,name,squad,price,myRating,mate,regularness,fvm,expMf,expPrice,expStd
 6407,D,Corazza,Bologna,1,3.2,,1,1,6.36,1,2
 6551,D,Ilic M.,Bologna,1,3.2,,1,1,6.34,1,2
 2167,C,Orsolini,Bologna,22,4.5,Ndoye,4,90,7.02,58,9
-5858,C,Ferguson,Bologna,18,4.2,,4,42,6.89,21,6
+5858,C,Ferguson,Bologna,18,4.2,,2,42,6.89,21,6
 6206,C,Fabbian,Bologna,13,4.2,Moro N.,4,43,6.85,22,6
 5564,C,Ndoye,Bologna,10,3.4,Orsolini,3,24,6.11,7,5
 5784,C,Aebischer,Bologna,10,3.2,Moro N.,4,20,5.93,4,5
@@ -306,7 +306,7 @@ id,role,name,squad,price,myRating,mate,regularness,fvm,expMf,expPrice,expStd
 6678,C,Liberali,Milan,1,2.8,,1,1,6.31,1,4
 313,A,Morata,Milan,27,4.0,,5,181,7.35,111,20
 4510,A,Leao,Milan,24,4.2,,5,200,7.6,125,22
-6227,A,Okafor,Milan,12,3.5,,4,21,7.21,1,7
+6227,A,Okafor,Milan,12,3.5,,3,21,7.21,1,7
 2438,A,Jovic,Milan,9,3.5,,3,16,7.14,1,7
 6519,A,Camarda,Milan,1,2.0,,1,1,5.34,1,6
 4867,P,Turati,Monza,8,3.3,,5,23,4.48,11,3
