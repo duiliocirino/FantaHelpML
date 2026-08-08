@@ -55,7 +55,10 @@ def main():
     excel_file = args.excel_file
     print(f"Excel file provided: {excel_file}")
 
-    process_teams_data(excel_file)
+    if args.output_file:
+        convert_xlsx_data_to_pkl(excel_file, args.output_file)
+    else:
+        convert_xlsx_data_to_pkl(excel_file)
 
 if __name__ == "__main__":
     main()

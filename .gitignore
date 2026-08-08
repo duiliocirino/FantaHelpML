@@ -13,3 +13,5 @@
 /svm_regressor_modelP.pkl
 /~$Fantacalcio_Stagione_2022_23.xlsx
 /~$Quotazioni_Fantacalcio_Stagione_2023_24.xlsx
+.venv/
+__pycache__/
