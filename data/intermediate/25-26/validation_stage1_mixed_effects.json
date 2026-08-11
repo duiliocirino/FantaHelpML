@@ -1,0 +1,35 @@
+{
+  "Por": {
+    "error": "too few rows"
+  },
+  "Dc": {
+    "error": "Singular matrix"
+  },
+  "B": {
+    "error": "too few rows"
+  },
+  "Dd": {
+    "error": "too few rows after filter"
+  },
+  "E": {
+    "error": "too few rows"
+  },
+  "M": {
+    "error": "Singular matrix"
+  },
+  "C": {
+    "error": "too few rows after filter"
+  },
+  "W": {
+    "error": "too few rows"
+  },
+  "T": {
+    "error": "too few rows"
+  },
+  "Pc": {
+    "error": "too few rows"
+  },
+  "A": {
+    "error": "too few rows"
+  }
+}

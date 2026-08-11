@@ -1,0 +1,23 @@
+{
+  "P": {
+    "count": 67,
+    "mean": 4.834925373134329,
+    "out_of_bounds": 0
+  },
+  "D": {
+    "count": 184,
+    "mean": 6.007228260869565,
+    "out_of_bounds": 1
+  },
+  "C": {
+    "count": 178,
+    "mean": 6.308483146067416,
+    "out_of_bounds": 0
+  },
+  "A": {
+    "count": 103,
+    "mean": 6.636407766990292,
+    "out_of_bounds": 0
+  },
+  "myrating_ok": true
+}
