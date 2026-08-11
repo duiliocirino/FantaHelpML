@@ -20,7 +20,7 @@ Key constraints:
 
 * Add first cell: `SEASON = "xx-yy"` and path helpers RAW_DIR, INTER_DIR, FINAL_DIR, MODELS_DIR.
 * Standardise IO:
-  - Stage 0: `data/raw/{SEASON}/Quotazioni_*.xlsx`, `copyCsvReal.xlsx`, `data/historical/*` → `data/intermediate/{SEASON}/data_preprocess_merge.xlsx`
+  - Stage 0: `data/raw/{SEASON}/Quotazioni_*.xlsx`, `data/utils/player_dob.csv`, `data/historical/*` → `data/intermediate/{SEASON}/data_preprocess_merge.xlsx`
   - Stage 1: reads above → `data/intermediate/{SEASON}/output_rp.csv`
   - Stage 2A: reads `output_rp.csv` + all `data/raw/{SEASON}/Rose_*.xlsx` → `models/fvm_distribution/{SEASON}/`
   - Stage 2B: reads `output_rp.csv` + models → `data/final/{SEASON}/players.csv`
@@ -31,11 +31,11 @@ Key constraints:
 
 Improvements:
 * Document mapping dict FantaHelp → Fantacalcio.
-* Parameterise age increment logic, explicit missing handling.
+* Age computed from DOB, no manual increment.
 * Validation checks:
   - Row count matches Quotazioni
   - Id unique
-  - Age incremented vs previous season for returning players
+  - Age computed for >99% players via DOB
   - Historical stats merged for players present in previous season
 
 Manual intervention remains after Stage 0.
@@ -81,7 +81,7 @@ Improvements:
   - Spot-check top players
 
 ## Data strategy
-* 25-26 trial: use Quotazioni 25-26 + copyCsvReal 25-26 + historical stats. Train Stage 2A on 24-25 auction data, predict 25-26 prices. Validate against 25-26 auction data when available.
+* 25-26 trial: use Quotazioni 25-26 + player_dob.csv + historical stats up to 24-25. Train Stage 2A on 24-25 auction data, predict 25-26 prices. Validate against 25-26 auction data when available.
 * 26-27 production: repeat with 25-26 auction data training for 26-27.
 * Optional public auction data from Italy can be used for in-season calibration, not for training production models until validated.
 
