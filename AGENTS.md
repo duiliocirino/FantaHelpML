@@ -50,6 +50,21 @@ CsvHelper matches case-insensitively. Keep column names exactly as above. `role_
 * Manual intervention points are by design: after Stage 0 update Age/Regularness/Mate.
 * Keep notebooks deterministic: set SEASON, avoid relative path magic.
 * Validation is mandatory per stage. Do not claim a stage works without running a smoke test.
+* Run Python via `poetry run python` and notebooks via `poetry run jupyter` to ensure dependencies.
+* Prefer repo tools `read_file`, `edit`, `grep` over inline Python for file edits; use bash only when a dedicated tool cannot do the task.
+
+## Docs as source of truth
+Agents working in this repo must read and keep these documents in sync with the actual codebase:
+* `docs/improvement-roadmap.md` — overall pipeline improvement plan, progress tracking, next actions
+* `docs/stage01_improvement_plan.md` — Stage 01 detailed improvement phases, status table, experiment tracking
+* Notebook markdown cells — methodology explanations inside notebooks must match what the code actually does
+
+When applying a change that affects methodology, parameters, or pipeline flow:
+1. Read the relevant doc(s) first to understand current state.
+2. Update the doc(s) alongside the code change — never let them drift.
+3. If a planned phase item is completed or abandoned, mark it in the status table.
+
+If docs and code contradict each other, or if the intended behavior is unclear, ask the user before proceeding — do not assume.
 
 ## Validation expectations per stage
 * Stage 0: row count matches Quotazioni, Age incremented correctly, no duplicate Id, historical stats merged for players present in previous season.

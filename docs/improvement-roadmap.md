@@ -32,11 +32,13 @@ Key constraints:
 Improvements:
 * Document mapping dict FantaHelp → Fantacalcio.
 * Age computed from DOB, no manual increment.
+* Historical FVM merged per season from data/raw/historical/* for seasons 22-23 onwards, columns FVM{season}
 * Validation checks:
   - Row count matches Quotazioni
   - Id unique
   - Age computed for >99% players via DOB
   - Historical stats merged for players present in previous season
+  - Historical FVM columns present for seasons 22-23+
 
 Manual intervention remains after Stage 0.
 
@@ -44,13 +46,27 @@ Manual intervention remains after Stage 0.
 **Focus:** stability of ExpectedMf and MyRating.
 
 Improvements:
-* Parameterise thresholds: min_matches, per-role matches_filter, FVM curve minimum games, age prediction branch >=16 games.
-* Make curve fitting reproducible with random_state where applicable.
+* Parameterise thresholds: min_matches, per-role matches_filter, FVM curve minimum games, age prediction branch >=16 games. ✅
+* Hybrid blend: `ExpectedMf = w_fvm × FVM_pred + (1 - w_fvm) × hist_perf` ✅
+  - `w_fvm = 0.75` (configurable)
+  - `hist_perf = Mf_last + age_modifier_weight × age_delta` if player has recent data
+  - Fallback: age curve prediction → FVM prediction
+* FVM modelling upgrade using historical FVM ✅
+  - Use per-season FVM{season} from Stage 0, introduced from 22-23.
+  - Pooled same-season weighted linear regression per Role_M: FVM_t → Mf_t on all seasons ≥22-23
+  - Observation weight: `clip(Pg, 0, 38) × exp(-season_decay × season_index)`
+  - Merge Ds into Dd for modelling to increase sample size
+  - `season_decay = 0.3` (exponential recency decay)
+* Age curve: quadratic per role, used as delta modifier (`age_modifier_weight = 0.2`) and fallback prior ✅
+* Pending improvements:
+  - Option B: ΔFVM = FVM_t - FVM_{t-1} as additional feature
+  - Option C: mixed-effects model with player random intercept
+  - Non-linear FVM (degree 2, monotonic spline)
+  - Role-specific blend weights
 * Validation:
-  - ExpectedMf range per role
-  - MyRating in [1,5]
-  - No NaNs in FVM/Price for active players
-  - Distribution comparison vs previous season
+  - ExpectedMf range per role ✅
+  - JSON report to `validation_stage1.json` ✅
+  - FVM model hold-out CV per role, MAE/RMSE vs single-season baseline (pending)
 
 ## Phase 3 – Stage 2A fvm_to_distribution – multi-league price modelling
 **Focus:** better auction price mean/std estimation.
@@ -93,8 +109,16 @@ Stage 2B: BE contract compliance report
 
 All reports saved under `data/intermediate/{SEASON}/validation_*.json` for reproducibility.
 
+## Progress (25-26 trial)
+* Stage 0: SEASON helpers, repo-root detection, DOB-based Age, missing DOB export, historical FVM merge, validation JSON ✅
+* Stage 1: SEASON helpers, repo-root detection, configurable parameters, hybrid ExpectedMf blend, weighted FVM regression, season recency decay, Ds→Dd merge, role-colored visualizations, explanatory markdown, per-role distribution validation ✅
+* Stage 2A: pending
+* Stage 2B: pending
+
 ## Next immediate actions
-1. Gather 25-26 raw files and place in `data/raw/25-26/`.
-2. Run Phase 0 standardisation on notebooks.
-3. Execute 25-26 trial Stage 0 → 1 → 2A → 2B with validation reports.
-4. Document findings and decide on model upgrade for 26-27.
+1. Stage 1 — Phase C1: test non-linear FVM (degree 2, monotonic spline) vs linear baseline
+2. Stage 1 — Phase C3: test ΔFVM feature for players with historical FVM
+3. Stage 1 — Phase E: role-specific blend weights grid search
+4. Apply same clean structure to Stage 2A and Stage 2B.
+5. Execute 25-26 trial Stage 0 → 1 → 2A → 2B with validation reports.
+6. Document findings and decide on model upgrade for 26-27.
