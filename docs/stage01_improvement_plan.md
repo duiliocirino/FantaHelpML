@@ -99,6 +99,22 @@ Each experiment creates:
 `data/intermediate/25-26/validation_stage1_exp_<name>.json`
 with keys: `experiment_name`, `params`, `per_role_mae`, `per_role_rmse`, `expectedmf_std`, `top20_diff`
 
+## Phase G — Tuning framework (NEW)
+G1. Build `pipeline/fvm_tuning.py` — automated hold-out validation framework
+  - Trains multiple FVM configs on all-but-last FVM season
+  - Validates on most recent FVM season (hold-out)
+  - Selects best config by lowest MAE
+  - Retrains on all data, saves report
+G2. Integrate into notebook as preliminary step (cells 4-5)
+  - `OVERRIDE_CONFIG` variable for manual override
+  - Report saved to `data/intermediate/{SEASON}/fvm_tuning_report.json`
+G3. Candidate configs tested:
+  - `linear_baseline`, `linear_w0.9`, `linear_w1.0`
+  - `linear_cap200`, `linear_cap200_w0.9` (FVM capped during training)
+  - `theilsen`, `theilsen_cap200` (robust regression)
+
+Acceptance: Framework runs end-to-end, produces report, notebook uses selected config
+
 ## Status
 | Phase | Item | Status |
 |---|---|---|
@@ -108,20 +124,35 @@ with keys: `experiment_name`, `params`, `per_role_mae`, `per_role_rmse`, `expect
 | C | Ds → Dd merge | ✅ Done |
 | C | Historical FVM pooling (all seasons ≥22-23) | ✅ Done |
 | C | C2 — Weight by games (`clip(Pg, 0, 38)`) | ✅ Done |
-| C | C1 — Non-linear FVM (degree 2, spline) | ⏳ Pending |
+| C | C1 — Non-linear FVM (degree 2, spline) | ❌ Rejected — overfits, worse RMSE |
 | C | C3 — ΔFVM feature | ⏳ Pending |
 | C | C4 — Per-season vs pooled comparison | ⏳ Pending |
-| D | Mixed-effects prototype | ⏳ Pending (insufficient within-player replication) |
+| D | Mixed-effects prototype | ❌ Rejected — insufficient within-player replication |
 | E | Role-specific blend weights | ⏳ Pending |
 | F | Final validation + parameter documentation | ⏳ Pending |
+| G | G1 — Tuning framework (`fvm_tuning.py`) | ✅ Done |
+| G | G2 — Notebook integration | ✅ Done |
+| G | G3 — Hold-out validation (7 configs) | ✅ Done — baseline wins (MAE=0.269) |
+
+## Hold-out validation findings (24-25)
+| Config | MAE | RMSE | Notes |
+|---|---|---|---|
+| linear_baseline | 0.269 | 0.362 | **Best** — lowest MAE |
+| linear_cap200 | 0.305 | 0.452 | Over-predicts Pc (MAE 0.691) and A |
+| theilsen | 0.300 | 0.403 | More robust but higher MAE overall |
+
+**Key insight**: The hold-out validation objectively selects the baseline linear model.
+The capped models increase spread but also increase MAE (over-predict for elite players).
+The framework gives the user the ability to override (`OVERRIDE_CONFIG`) if they prefer
+more spread at the cost of accuracy.
 
 ## Next immediate action
-1. Phase C1 — Test non-linear FVM (degree 2, monotonic spline) vs linear baseline
-2. Phase C3 — Test ΔFVM feature for players with historical FVM
-3. Phase E — Role-specific blend weights grid search
-4. Phase F — Final validation report
+1. Phase C3 — Test ΔFVM feature for players with historical FVM
+2. Phase E — Role-specific blend weights grid search
+3. Phase F — Final validation report
+4. Extend tuning framework with ΔFVM and role-specific configs
 
 ## Risks
-* Overfitting with degree 2 FVM on small roles
 * ΔFVM missing for new players → fallback to FVM only
-* Mixed-effects requires more compute and careful convergence
+* Hold-out may not generalize to future seasons (only 2 training seasons available)
+* Capped FVM models over-predict for elite players when applied to uncapped FVM
