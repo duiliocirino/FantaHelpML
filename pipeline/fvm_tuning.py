@@ -20,31 +20,66 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 
 # ---------------------------------------------------------------------------
-# Constants
+# Config loader — reads pipeline/config/stage01.yaml
 # ---------------------------------------------------------------------------
-ROLES_M = ['Por', 'Dc', 'B', 'Dd', 'Ds', 'E', 'M', 'C', 'W', 'T', 'Pc', 'A']
-ROLE_NORM_MAP = {'Ds': 'Dd'}  # merge Ds into Dd for modelling
+def _find_config() -> str:
+    """Locate stage01.yaml relative to this file."""
+    here = Path(__file__).resolve().parent
+    cfg = here / 'config' / 'stage01.yaml'
+    if cfg.exists():
+        return str(cfg)
+    raise FileNotFoundError(
+        f"stage01.yaml not found at {cfg}. "
+        f"Ensure pipeline/config/stage01.yaml exists."
+    )
 
-# Candidate configurations to evaluate
-# Each config: dict with keys method, fvm_cap, w_fvm, age_mod
-CANDIDATE_CONFIGS = {
-    'linear_baseline':      {'method': 'linear',  'fvm_cap': None,  'w_fvm': 0.8, 'age_mod': 0.2},
-    'linear_w0.9':          {'method': 'linear',  'fvm_cap': None,  'w_fvm': 0.9, 'age_mod': 0.2},
-    'linear_w1.0':          {'method': 'linear',  'fvm_cap': None,  'w_fvm': 1.0, 'age_mod': 0.0},
-    'linear_cap200':         {'method': 'linear',  'fvm_cap': 200,   'w_fvm': 0.8, 'age_mod': 0.2},
-    'linear_cap200_w0.9':    {'method': 'linear',  'fvm_cap': 200,   'w_fvm': 0.9, 'age_mod': 0.2},
-    'theilsen':              {'method': 'theilsen','fvm_cap': None,  'w_fvm': 0.8, 'age_mod': 0.2},
-    'theilsen_cap200':       {'method': 'theilsen','fvm_cap': 200,   'w_fvm': 0.8, 'age_mod': 0.2},
-}
 
-# Fitting defaults
-FVM_MIN_GAMES = 24       # minimum Pg for an observation to enter FVM training
-AGE_MIN_GAMES = 16       # minimum Pg for a player to count as "has recent data"
-SEASON_DECAY = 0.3       # exponential recency decay for age curve & FVM weights
-AGE_MAX = 34             # cap age for polynomial fitting
-MIN_OBS = 10             # minimum observations to fit a model
+def load_config() -> dict:
+    """Load and resolve the Stage 01 config from YAML."""
+    if yaml is None:
+        raise ImportError("PyYAML is required: poetry add pyyaml")
+    with open(_find_config()) as f:
+        cfg = yaml.safe_load(f)
+
+    # Resolve role-specific w_fvm references
+    blend = cfg.get('role_blend_weights', {})
+    for name, c in cfg.get('candidate_configs', {}).items():
+        if c.get('w_fvm') == 'role_specific':
+            c['w_fvm'] = blend
+
+    return cfg
+
+
+def _build_aliases(cfg: dict) -> None:
+    """Backward-compatible module-level aliases (populated from config)."""
+    global ROLES_M, ROLE_NORM_MAP, ROLE_TO_MAJOR, ROLE_BLEND_WEIGHTS
+    global CANDIDATE_CONFIGS, FVM_MIN_GAMES, AGE_MIN_GAMES
+    global SEASON_DECAY, AGE_MAX, MIN_OBS, MATCHES_FILTERS, FVM_SCALE
+
+    ROLES_M = cfg['roles']['sub']
+    ROLE_NORM_MAP = cfg['role_norm_map']
+    ROLE_TO_MAJOR = cfg['role_to_major']
+    ROLE_BLEND_WEIGHTS = cfg['role_blend_weights']
+    CANDIDATE_CONFIGS = cfg['candidate_configs']
+    FVM_MIN_GAMES = cfg['fitting']['fvm_min_games']
+    AGE_MIN_GAMES = cfg['fitting']['age_min_games']
+    SEASON_DECAY = cfg['fitting']['season_decay']
+    AGE_MAX = cfg['fitting']['age_max']
+    MIN_OBS = cfg['fitting']['min_obs']
+    MATCHES_FILTERS = cfg['matches_filters']
+    FVM_SCALE = cfg.get('fvm_scale', {r: 1.0 for r in cfg['roles']['major']})
+
+
+# Initialize from config on import
+_cfg = load_config()
+_build_aliases(_cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +191,15 @@ def fit_theilsen(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return np.array([med_slope, med_intercept])
 
 
+def transform_fvm(x: np.ndarray | float, transform: str) -> np.ndarray | float:
+    """Apply FVM transformation before fitting/prediction."""
+    if transform == 'sqrt':
+        return np.sqrt(x) if isinstance(x, np.ndarray) else np.sqrt(x)
+    return x  # 'linear' — no transform
+
+
 def fit_fvm_model(data: pd.DataFrame, method: str,
-                  fvm_cap: int | None) -> np.ndarray | None:
+                  fvm_cap: int | None, transform: str = 'linear') -> np.ndarray | None:
     """
     Fit a FVM→Mf model.
 
@@ -165,6 +207,8 @@ def fit_fvm_model(data: pd.DataFrame, method: str,
       extreme values from flattening the slope).  Predictions use the
       actual FVM (uncapped).
     - method: 'linear' (weighted OLS) or 'theilsen' (robust median slope).
+    - transform: 'linear' (raw FVM) or 'sqrt' (sqrt(FVM) — compresses
+      extremes, expands low-mid range where most defenders sit).
     """
     if len(data) < MIN_OBS:
         return None
@@ -172,9 +216,9 @@ def fit_fvm_model(data: pd.DataFrame, method: str,
     y = data['MfPerformance'].values if 'MfPerformance' in data.columns else data['Mf'].values
     w = np.clip(data['Pg'].values, 0, 38)
 
-    x_fit = x.copy()
+    x_fit = transform_fvm(x, transform)
     if fvm_cap is not None:
-        x_fit = np.minimum(x_fit, fvm_cap)
+        x_fit = np.minimum(x_fit, transform_fvm(float(fvm_cap), transform))
 
     if method == 'theilsen':
         return fit_theilsen(x_fit, y)
@@ -182,9 +226,11 @@ def fit_fvm_model(data: pd.DataFrame, method: str,
         return fit_linear(x_fit, y, w)
 
 
-def predict_fvm(coef: np.ndarray, fvm_val: float) -> float:
-    """Predict Mf from FVM using fitted linear coefficients."""
-    return float(np.polyval(coef, fvm_val))
+def predict_fvm(coef: np.ndarray, fvm_val: float,
+                transform: str = 'linear') -> float:
+    """Predict Mf from FVM using fitted coefficients and matching transform."""
+    x = transform_fvm(fvm_val, transform)
+    return float(np.polyval(coef, x))
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +271,37 @@ def age_prediction(age: float, model) -> float:
 # ---------------------------------------------------------------------------
 # ExpectedMf computation
 # ---------------------------------------------------------------------------
+def resolve_w_fvm(w_fvm_spec, role: str) -> float:
+    """Resolve w_fvm for a given role. Accepts float (global) or dict (role-specific)."""
+    if isinstance(w_fvm_spec, dict):
+        major = ROLE_TO_MAJOR.get(role, 'C')
+        return w_fvm_spec.get(major, 0.8)
+    return float(w_fvm_spec)
+
+
+def resolve_transform(transform_spec, role: str) -> str:
+    """Resolve transform for a given role. Accepts str (global) or dict {major_role: transform}."""
+    if isinstance(transform_spec, dict):
+        major = ROLE_TO_MAJOR.get(role, 'C')
+        return transform_spec.get(major, 'linear')
+    return str(transform_spec)
+
+
+def resolve_fvm_scale(scale_spec, role: str) -> float:
+    """Resolve fvm_scale for a given role. Accepts float (global) or dict {major_role: scale}."""
+    if isinstance(scale_spec, dict):
+        major = ROLE_TO_MAJOR.get(role, 'C')
+        return scale_spec.get(major, 1.0)
+    return float(scale_spec)
+
+
 def compute_expected_mf(df: pd.DataFrame, fvm_coefs: dict[str, np.ndarray | None],
                         age_models: dict[str, any],
                         seasons: list[str],
-                        w_fvm: float, age_mod: float,
-                        matches_filters: dict[str, int]) -> pd.DataFrame:
+                        w_fvm: float | dict, age_mod: float,
+                        matches_filters: dict[str, int],
+                        transform: str | dict = 'linear',
+                        fvm_scale: float | dict = 1.0) -> pd.DataFrame:
     """
     Compute ExpectedMf for every player in df.
 
@@ -237,6 +309,9 @@ def compute_expected_mf(df: pd.DataFrame, fvm_coefs: dict[str, np.ndarray | None
     ----------
     fvm_coefs : {role: coef_array | None}
     age_models : {role: Polynomial | None}
+    w_fvm : float or {major_role: float} — blend weight for FVM vs history
+    transform : str or {major_role: str} — 'linear' or 'sqrt', must match what was used during fitting
+    fvm_scale : float or {major_role: float} — multiplier on FVM prediction to counteract conservative regression
     """
     result = df.copy()
     result['ExpectedMf'] = np.nan
@@ -254,11 +329,17 @@ def compute_expected_mf(df: pd.DataFrame, fvm_coefs: dict[str, np.ndarray | None
             if role not in ROLES_M:
                 continue
 
+            # Resolve per-role transform
+            role_transform = resolve_transform(transform, role)
+
             # FVM prediction
             fvm_val = row.get('FVM')
             coef = fvm_coefs.get(role)
             if coef is not None and pd.notna(fvm_val):
-                fvm_perf = predict_fvm(coef, float(fvm_val))
+                fvm_perf = predict_fvm(coef, float(fvm_val), role_transform)
+                # Apply per-role scale to counteract conservative regression
+                role_scale = resolve_fvm_scale(fvm_scale, role)
+                fvm_perf *= role_scale
             else:
                 fvm_perf = 5.0
 
@@ -278,7 +359,8 @@ def compute_expected_mf(df: pd.DataFrame, fvm_coefs: dict[str, np.ndarray | None
                 if pd.isna(hist_perf) or hist_perf == 5.0:
                     hist_perf = fvm_perf
 
-            expected = w_fvm * fvm_perf + (1 - w_fvm) * hist_perf
+            w = resolve_w_fvm(w_fvm, role)
+            expected = w * fvm_perf + (1 - w) * hist_perf
             result.at[idx, 'ExpectedMf'] = round(expected, 2)
             result.at[idx, 'FVM_pred'] = round(fvm_perf, 2)
             result.at[idx, 'Hist_perf'] = round(hist_perf, 2)
@@ -293,7 +375,8 @@ def compute_expected_mf(df: pd.DataFrame, fvm_coefs: dict[str, np.ndarray | None
 def validate_holdout(df: pd.DataFrame, seasons: list[str],
                      fvm_coefs: dict[str, np.ndarray | None],
                      age_models: dict[str, any],
-                     cfg: dict, matches_filters: dict[str, int]) -> dict:
+                     cfg: dict, matches_filters: dict[str, int],
+                     transform: str | dict = 'linear') -> dict:
     """
     Validate on the most recent season.
 
@@ -318,6 +401,7 @@ def validate_holdout(df: pd.DataFrame, seasons: list[str],
         role_df = df[mask]
 
         preds, actuals = [], []
+        role_transform = resolve_transform(transform, role)
         for _, row in role_df.iterrows():
             fvm_val = row.get(fvm_col)
             mf_val = row.get(mf_col)
@@ -327,7 +411,7 @@ def validate_holdout(df: pd.DataFrame, seasons: list[str],
                     and pg_val >= FVM_MIN_GAMES):
                 coef = fvm_coefs.get(role)
                 if coef is not None:
-                    pred = predict_fvm(coef, float(fvm_val))
+                    pred = predict_fvm(coef, float(fvm_val), role_transform)
                     preds.append(pred)
                     actuals.append(float(mf_val))
 
@@ -354,10 +438,6 @@ def validate_holdout(df: pd.DataFrame, seasons: list[str],
 # ---------------------------------------------------------------------------
 # Full tuning pipeline
 # ---------------------------------------------------------------------------
-MATCHES_FILTERS = {
-    'Por': 8, 'Dc': 25, 'B': 22, 'Dd': 29, 'Ds': 29, 'E': 27,
-    'M': 26, 'C': 28, 'W': 24, 'T': 19, 'Pc': 27, 'A': 29,
-}
 
 
 def run_tuning(input_path: str, output_dir: str, verbose: bool = True):
@@ -400,16 +480,18 @@ def run_tuning(input_path: str, output_dir: str, verbose: bool = True):
 
     # --- Phase 1: evaluate each config on hold-out ---
     for name, cfg in CANDIDATE_CONFIGS.items():
+        transform = cfg.get('transform', 'linear')
         # Train on all-but-last FVM season
         coefs = {}
         for role in ROLES_M:
             data = collect_fvm_pairs(role_subsets[role], train_seasons)
-            coefs[role] = fit_fvm_model(data, cfg['method'], cfg['fvm_cap'])
+            role_transform = resolve_transform(transform, role)
+            coefs[role] = fit_fvm_model(data, cfg['method'], cfg['fvm_cap'], role_transform)
 
         # Validate on hold-out
         if holdout_seasons:
             val = validate_holdout(
-                df, fvm_seasons, coefs, {}, cfg, MATCHES_FILTERS
+                df, fvm_seasons, coefs, {}, cfg, MATCHES_FILTERS, transform
             )
         else:
             val = {'per_role': {}, 'overall_mae': None, 'overall_rmse': None, 'total_n': 0}
@@ -447,10 +529,12 @@ def run_tuning(input_path: str, output_dir: str, verbose: bool = True):
 
     # --- Phase 3: retrain best config on ALL FVM seasons ---
     best_cfg = CANDIDATE_CONFIGS[best_name]
+    best_transform = best_cfg.get('transform', 'linear')
     final_coefs = {}
     for role in ROLES_M:
         data = collect_fvm_pairs(role_subsets[role], fvm_seasons)
-        final_coefs[role] = fit_fvm_model(data, best_cfg['method'], best_cfg['fvm_cap'])
+        role_transform = resolve_transform(best_transform, role)
+        final_coefs[role] = fit_fvm_model(data, best_cfg['method'], best_cfg['fvm_cap'], role_transform)
 
     # --- Phase 4: fit age curves on ALL seasons ---
     age_models = {}
@@ -464,6 +548,8 @@ def run_tuning(input_path: str, output_dir: str, verbose: bool = True):
         df, final_coefs, age_models, seasons,
         w_fvm=best_cfg['w_fvm'], age_mod=best_cfg['age_mod'],
         matches_filters=MATCHES_FILTERS,
+        transform=best_transform,
+        fvm_scale=best_cfg.get('fvm_scale', 1.0),
     )
 
     # --- Phase 6: build report ---
@@ -490,13 +576,18 @@ def run_tuning(input_path: str, output_dir: str, verbose: bool = True):
         else:
             final_coef_report[role] = None
 
+    # Serialize w_fvm (may be dict or float)
+    best_cfg_serializable = dict(best_cfg)
+    if isinstance(best_cfg_serializable['w_fvm'], dict):
+        best_cfg_serializable['w_fvm'] = best_cfg_serializable['w_fvm']
+
     report = {
         'season': seasons[0] if seasons else 'unknown',
         'fvm_seasons': fvm_seasons,
         'train_seasons': train_seasons,
         'holdout_seasons': holdout_seasons,
         'best_config_name': best_name,
-        'best_config': best_cfg,
+        'best_config': best_cfg_serializable,
         'config_comparison': {
             name: {
                 'config': res['config'],
