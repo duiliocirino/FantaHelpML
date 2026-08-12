@@ -1,0 +1,181 @@
+# Stage 01 — Ratings Configuration
+# All tunable parameters for ExpectedMf computation in one place.
+
+# ---------------------------------------------------------------------------
+# Roles
+# ---------------------------------------------------------------------------
+roles:
+  major: [P, D, C, A]
+  sub: [Por, Dc, B, Dd, Ds, E, M, C, W, T, Pc, A]
+
+# Sub-role → major role mapping (used for role-specific blend weights)
+# E (esterno/ala) → C (wing-back in 3-5-2 is a midfielder)
+# T (trequartista) → C (attacking midfielder, sits between C and A but is a midfielder)
+# Pc (seconda punta) → A (true attacking role)
+role_to_major:
+  Por: P
+  Dc: D
+  B: D
+  Dd: D
+  Ds: D
+  E: C
+  M: C
+  C: C
+  W: C
+  T: C
+  Pc: A
+  A: A
+
+# Merge these sub-roles into the target during modelling
+role_norm_map:
+  Ds: Dd
+
+# ---------------------------------------------------------------------------
+# Visualization
+# ---------------------------------------------------------------------------
+role_colors:
+  Por: '#FFB74D'
+  Dc: '#64B5F6'
+  B: '#64B5F6'
+  Dd: '#64B5F6'
+  Ds: '#64B5F6'
+  E: '#81C784'     # E (esterno/ala) → midfielder color
+  M: '#81C784'
+  C: '#81C784'
+  W: '#81C784'
+  T: '#81C784'     # T (trequartista) → midfielder color
+  Pc: '#E57373'    # Pc (seconda punta) → attacker color
+  A: '#E57373'
+
+# ---------------------------------------------------------------------------
+# Fitting defaults
+# ---------------------------------------------------------------------------
+fitting:
+  fvm_min_games: 24       # minimum Pg for an observation to enter FVM training
+  age_min_games: 16       # minimum Pg for a player to count as "has recent data"
+  season_decay: 0.3       # exponential recency decay for age curve & FVM weights
+  age_max: 34             # cap age for polynomial fitting
+  min_obs: 10             # minimum observations to fit a model
+
+# Per-role minimum matches filter for age curve fitting
+# Order matches roles.sub: [Por, Dc, B, Dd, Ds, E, M, C, W, T, Pc, A]
+matches_filters:
+  Por: 8
+  Dc: 25
+  B: 22
+  Dd: 29
+  Ds: 29
+  E: 27
+  M: 26
+  C: 28
+  W: 24
+  T: 19
+  Pc: 27
+  A: 29
+
+# ---------------------------------------------------------------------------
+# Blend weights (role-specific: major_role → w_fvm)
+# ---------------------------------------------------------------------------
+role_blend_weights:
+  P: 0.8
+  D: 0.7
+  C: 0.8
+  A: 0.8
+
+# Per-role multiplier on FVM prediction (counteracts conservative regression)
+# Applied as: fvm_pred_scaled = fvm_pred * fvm_scale[role]
+fvm_scale:
+  P: 1.0
+  D: 1.05
+  C: 1.05
+  A: 1.05
+
+# ---------------------------------------------------------------------------
+# Candidate configs for hold-out tuning
+# Each config: method, fvm_cap, transform, w_fvm, age_mod
+#   transform: 'linear' (raw FVM), 'sqrt' (sqrt(FVM)), or dict {major_role: transform}
+#   w_fvm: float (global) or 'role_specific' (uses role_blend_weights)
+# ---------------------------------------------------------------------------
+candidate_configs:
+  linear_baseline:
+    method: linear
+    fvm_cap: null
+    transform: linear
+    w_fvm: 0.8
+    age_mod: 0.2
+  linear_w0.9:
+    method: linear
+    fvm_cap: null
+    transform: linear
+    w_fvm: 0.9
+    age_mod: 0.2
+  linear_w1.0:
+    method: linear
+    fvm_cap: null
+    transform: linear
+    w_fvm: 1.0
+    age_mod: 0.0
+  linear_cap200:
+    method: linear
+    fvm_cap: 200
+    transform: linear
+    w_fvm: 0.8
+    age_mod: 0.2
+  linear_cap200_w0.9:
+    method: linear
+    fvm_cap: 200
+    transform: linear
+    w_fvm: 0.9
+    age_mod: 0.2
+  theilsen:
+    method: theilsen
+    fvm_cap: null
+    transform: linear
+    w_fvm: 0.8
+    age_mod: 0.2
+  theilsen_cap200:
+    method: theilsen
+    fvm_cap: 200
+    transform: linear
+    w_fvm: 0.8
+    age_mod: 0.2
+  sqrt_baseline:
+    method: linear
+    fvm_cap: null
+    transform: sqrt
+    w_fvm: 0.8
+    age_mod: 0.2
+  sqrt_role_weights:
+    method: linear
+    fvm_cap: null
+    transform: sqrt
+    w_fvm: role_specific
+    age_mod: 0.2
+  sqrt_pd_linear_ac:
+    # sqrt for P/D (compresses extreme defender FVM), linear for C/A (preserves attacker spread)
+    method: linear
+    fvm_cap: null
+    transform:
+      P: sqrt
+      D: sqrt
+      C: linear
+      A: linear
+    w_fvm: role_specific
+    age_mod: 0.4
+    fvm_scale:
+      P: 1.0
+      D: 1.05
+      C: 1.05
+      A: 1.05
+
+# Active override config (set to null for automatic hold-out selection)
+override_config: sqrt_pd_linear_ac
+
+# ---------------------------------------------------------------------------
+# Validation bounds for ExpectedMf per major role
+# ---------------------------------------------------------------------------
+expected_mf_bounds:
+  P: [3.0, 6.0]
+  D: [4.0, 7.5]
+  C: [4.0, 9.0]
+  A: [4.5, 10.0]
