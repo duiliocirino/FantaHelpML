@@ -46,27 +46,32 @@ Manual intervention remains after Stage 0.
 **Focus:** stability of ExpectedMf and MyRating.
 
 Improvements:
-* Parameterise thresholds: min_matches, per-role matches_filter, FVM curve minimum games, age prediction branch >=16 games. ✅
+* All parameters centralized in `pipeline/config/stage01.yaml`. ✅
 * Hybrid blend: `ExpectedMf = w_fvm × FVM_pred + (1 - w_fvm) × hist_perf` ✅
-  - `w_fvm = 0.75` (configurable)
+  - `w_fvm` is **role-specific**: `{'P': 0.8, 'D': 0.7, 'C': 0.8, 'A': 0.8}`
   - `hist_perf = Mf_last + age_modifier_weight × age_delta` if player has recent data
   - Fallback: age curve prediction → FVM prediction
 * FVM modelling upgrade using historical FVM ✅
   - Use per-season FVM{season} from Stage 0, introduced from 22-23.
   - Pooled same-season weighted linear regression per Role_M: FVM_t → Mf_t on all seasons ≥22-23
-  - Observation weight: `clip(Pg, 0, 38) × exp(-season_decay × season_index)`
+  - Observation weight: `clip(Pg, 0, 38)`
+  - **Per-role transform**: `sqrt(FVM)` for P/D, `linear(FVM)` for C/A
+  - **fvm_scale**: per-role multiplier on FVM prediction (`{'P':1.0,'D':1.05,'C':1.05,'A':1.05}`)
   - Merge Ds into Dd for modelling to increase sample size
-  - `season_decay = 0.3` (exponential recency decay)
-* Age curve: quadratic per role, used as delta modifier (`age_modifier_weight = 0.2`) and fallback prior ✅
+  - `season_decay = 0.3` (exponential recency decay on age curve)
+  - `age_modifier_weight = 0.4`
+* Automated hold-out tuning framework (`pipeline/fvm_tuning.py`) ✅
+  - 10 candidate configs, validated on most recent FVM season
+  - `OVERRIDE_CONFIG` in YAML for manual selection
+  - Report saved to `fvm_tuning_report.json`
+* Role mapping: E (esterno) → C, T (trequartista) → C, Pc (seconda punta) → A ✅
 * Pending improvements:
-  - Option B: ΔFVM = FVM_t - FVM_{t-1} as additional feature
-  - Option C: mixed-effects model with player random intercept
-  - Non-linear FVM (degree 2, monotonic spline)
-  - Role-specific blend weights
+  - ΔFVM = FVM_t - FVM_{t-1} as additional feature
+  - Per-season vs pooled FVM comparison
 * Validation:
   - ExpectedMf range per role ✅
   - JSON report to `validation_stage1.json` ✅
-  - FVM model hold-out CV per role, MAE/RMSE vs single-season baseline (pending)
+  - FVM model hold-out CV per role, MAE/RMSE ✅
 
 ## Phase 3 – Stage 2A fvm_to_distribution – multi-league price modelling
 **Focus:** better auction price mean/std estimation.
@@ -111,14 +116,14 @@ All reports saved under `data/intermediate/{SEASON}/validation_*.json` for repro
 
 ## Progress (25-26 trial)
 * Stage 0: SEASON helpers, repo-root detection, DOB-based Age, missing DOB export, historical FVM merge, validation JSON ✅
-* Stage 1: SEASON helpers, repo-root detection, configurable parameters, hybrid ExpectedMf blend, weighted FVM regression, season recency decay, Ds→Dd merge, role-colored visualizations, explanatory markdown, per-role distribution validation ✅
+* Stage 1: SEASON helpers, repo-root detection, configurable parameters, hybrid ExpectedMf blend, weighted FVM regression, season recency decay, Ds→Dd merge, role-colored visualizations, explanatory markdown, per-role distribution validation, sqrt FVM transform, role-specific blend weights, hold-out tuning framework ✅
 * Stage 2A: pending
 * Stage 2B: pending
 
 ## Next immediate actions
-1. Stage 1 — Phase C1: test non-linear FVM (degree 2, monotonic spline) vs linear baseline
-2. Stage 1 — Phase C3: test ΔFVM feature for players with historical FVM
-3. Stage 1 — Phase E: role-specific blend weights grid search
+1. Stage 1 — Phase C3: test ΔFVM feature for players with historical FVM
+2. Stage 1 — Phase C4: per-season vs pooled FVM comparison
+3. Stage 1 — Phase F: final validation report
 4. Apply same clean structure to Stage 2A and Stage 2B.
 5. Execute 25-26 trial Stage 0 → 1 → 2A → 2B with validation reports.
 6. Document findings and decide on model upgrade for 26-27.
