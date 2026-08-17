@@ -19,5 +19,7 @@
     "mean": 6.900291262135923,
     "out_of_bounds": 0
   },
-  "myrating_ok": true
+  "myrating_ok": true,
+  "myrating_mean": 3.5657894736842106,
+  "myrating_missing": 0
 }
