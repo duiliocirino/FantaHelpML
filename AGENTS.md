@@ -10,16 +10,20 @@ pipeline/
   01_ratings.ipynb                # Stage 1
   02_fvm_to_distribution.ipynb    # Stage 2A
   03_regressors.ipynb             # Stage 2B - active final output
-  04_expected_price.ipynb         # predecessor
+  config/                         # stage01.yaml, stage2a2b.yaml
+  auction_loader.py               # canonical auction input contract (Stage 2A)
+  price_models.py                 # shared FVM->price model utils (2A/2B)
+  fvm_tuning.py                   # Stage 1 hold-out tuning framework
+  archive/04_expected_price.ipynb # archived predecessor, do not run
 data/
-  raw/{SEASON}/          # unmodified source
-  intermediate/{SEASON}/ # stage outputs
+  raw/{SEASON}/          # unmodified source (Quotazioni, Rose_*, copyCsvReal)
+  intermediate/{SEASON}/ # stage outputs + validation_*.json
   final/{SEASON}/        # BE-ready players.csv
   historical/            # 5 seasons stats
 models/
   fvm_distribution/{SEASON}/ # joblib mean/std per role
   multi_feature/           # lasso/ridge experiments
-explorations/            # validation / post-hoc
+explorations/            # validation / post-hoc (incl. legacy regressor experiments)
 scratch/                 # temp work, safe landing for remote files
 ```
 
@@ -34,7 +38,7 @@ Stage 0: reads `data/raw/{SEASON}/Quotazioni_*.xlsx`, `copyCsvReal.xlsx`, `data/
 
 Stage 1: reads `data/intermediate/{SEASON}/data_preprocess_merge.xlsx`. Writes `data/intermediate/{SEASON}/output_rp.csv` with columns Id,Role,Role_M,Name,Squad,Price,Age,MyRating,Mate,Regularness,FVM,ExpectedMf + historical stats.
 
-Stage 2A: reads `data/intermediate/{SEASON}/output_rp.csv` + all `data/raw/{SEASON}/Rose_*.xlsx`. Writes `models/fvm_distribution/{SEASON}/model_mean/std_[P,D,C,A].joblib`.
+Stage 2A: reads all `data/raw/{SEASON}/Rose_*.xlsx` (+ prior season dir) + per-season FVM from `data/raw/{s}/Quotazioni_*.xlsx` (each auction pairs with the FVM of its own season). Does NOT read `output_rp.csv`. Writes `models/fvm_distribution/{SEASON}/model_mean/std_[P,D,C,A].joblib`.
 
 Stage 2B: reads `output_rp.csv` + models. Writes `data/final/{SEASON}/players.csv` with BE columns:
 `id,role,role_m,name,squad,price,age,myrating,mate,regularness,fvm,expmf,expprice,expstd`
@@ -69,8 +73,8 @@ If docs and code contradict each other, or if the intended behavior is unclear, 
 ## Validation expectations per stage
 * Stage 0: row count matches Quotazioni, Age incremented correctly, no duplicate Id, historical stats merged for players present in previous season.
 * Stage 1: ExpectedMf in plausible range, MyRating 1-5, no NaNs in FVM/Price for active players.
-* Stage 2A: training data has count>=8 filter, per-role FVM floor applied, models load and predict without error, mean>=1, std>=1.
-* Stage 2B: final CSV schema matches BE contract, expprice/expstd >0, no duplicate Id, spot-check top players.
+* Stage 2A: training data has count>=8 filter (auction transactions per player per auction), per-role FVM floor applied, models load and predict without error, mean>=1, std>=1; `validation_stage2a.json` written (hold-out MAE, FVM-bin MAE, cross-season drift).
+* Stage 2B: final CSV schema matches BE contract, expprice/expstd >0, no duplicate Id, spot-check top players; `validation_stage2b.json` written.
 
 ## Coding standards
 Clear typing, clarity, separation of concerns, modularity, documentation. Simplicity over over-engineering. After first version, review and reduce complexity. Smoke test changes.
