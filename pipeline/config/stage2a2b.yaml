@@ -1,0 +1,54 @@
+# Stage 2A / 2B — Price model configuration
+# Centralized config for the auction-price pipeline:
+#   Stage 2A (02_fvm_to_distribution.ipynb): train FVM -> price models from auction data
+#   Stage 2B (03_regressors.ipynb):          predict expprice/expstd + final BE CSV
+# See docs/phase3_stage2a2b_plan.md for methodology and the canonical input contract.
+
+# ---------------------------------------------------------------------------
+# Roles
+# ---------------------------------------------------------------------------
+roles:
+  major: [P, D, C, A]
+
+# ---------------------------------------------------------------------------
+# Stage 2A — auction data loading
+# ---------------------------------------------------------------------------
+training:
+  # Auction directories to load, in recency order (first = weight 1.0):
+  #   'current' = data/raw/{SEASON}    (the t-1 season auction, per Rose semantics)
+  #   'prior'   = data/raw/{SEASON-1}  (the t-2 season auction, down-weighted)
+  rose_dirs: [current, prior]
+  # Recency weight applied to the prior-season auction (current is always 1.0)
+  recency_weight: 0.7
+  # Min auction transactions per (player, auction) to enter training. A Rose
+  # file contains every transaction of every fantasy team across all leagues
+  # of the export, so a player bought by 8+ teams has a reliable market price.
+  min_count: 8
+  # Per-role FVM floor for training data
+  fvm_floor:
+    P: 1
+    D: 10
+    C: 1
+    A: 1
+  # Default league-format tag for Rose xlsx files
+  # (external auction_*.csv files carry their own tag in the filename)
+  rose_format: "800_8"
+
+# ---------------------------------------------------------------------------
+# Stage 2A — model configuration
+# ---------------------------------------------------------------------------
+model:
+  mean_method: "ridge_sqrt"       # Ridge([sqrt(FVM), FVM]) — non-linear FVM -> price
+  std_method: "binned_empirical"  # empirical std per FVM bin, Ridge-smoothed
+  ridge_alpha: 1.0                # Ridge regularization
+  std_bin_width: 10               # FVM bin width for empirical std
+  std_min: 1                      # floor for std predictions
+
+# ---------------------------------------------------------------------------
+# Stage 2B — inference
+# ---------------------------------------------------------------------------
+inference:
+  residual_correction: "none"     # none | additive | multiplicative | capped_additive (experimental)
+  residual_weight: 0.1            # strength of the ExpectedMf-based correction
+  price_min: 1                    # floor for expprice
+  std_min: 1                      # floor for expstd

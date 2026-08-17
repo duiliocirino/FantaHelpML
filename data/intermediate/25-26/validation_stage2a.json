@@ -1,0 +1,142 @@
+{
+  "season": "25-26",
+  "training_auctions": [
+    "23-24",
+    "24-25"
+  ],
+  "recency_weight": 0.7,
+  "model_mean": "ridge_sqrt",
+  "model_std": "binned_empirical",
+  "n_training_players": 374,
+  "ridge_beats_baseline_roles": [
+    "P",
+    "D",
+    "A"
+  ],
+  "per_role_metrics": {
+    "P": {
+      "mae": 11.57,
+      "rmse": 12.44,
+      "n_train": 37,
+      "n_holdout": 9
+    },
+    "D": {
+      "mae": 5.38,
+      "rmse": 7.28,
+      "n_train": 88,
+      "n_holdout": 26
+    },
+    "C": {
+      "mae": 9.34,
+      "rmse": 11.85,
+      "n_train": 95,
+      "n_holdout": 29
+    },
+    "A": {
+      "mae": 22.55,
+      "rmse": 33.61,
+      "n_train": 71,
+      "n_holdout": 19
+    }
+  },
+  "overfit_check": {
+    "P": {
+      "holdout_mae": 11.57,
+      "train_mae": 5.83,
+      "ok": false
+    },
+    "D": {
+      "holdout_mae": 5.38,
+      "train_mae": 5.96,
+      "ok": true
+    },
+    "C": {
+      "holdout_mae": 9.34,
+      "train_mae": 8.78,
+      "ok": true
+    },
+    "A": {
+      "holdout_mae": 22.55,
+      "train_mae": 15.32,
+      "ok": false
+    }
+  },
+  "std_bin_mae": {
+    "P": 4.85,
+    "D": 5.38,
+    "C": 9.2,
+    "A": 23.88
+  },
+  "fvm_bin_metrics": {
+    "1-10": {
+      "mae": 8.47,
+      "count": 3.0,
+      "mean_actual": 2.91,
+      "mean_pred": -5.56
+    },
+    "11-20": {
+      "mae": 3.52,
+      "count": 22.0,
+      "mean_actual": 4.61,
+      "mean_pred": 4.59
+    },
+    "21-50": {
+      "mae": 8.95,
+      "count": 33.0,
+      "mean_actual": 14.32,
+      "mean_pred": 17.04
+    },
+    "51-100": {
+      "mae": 12.81,
+      "count": 14.0,
+      "mean_actual": 45.21,
+      "mean_pred": 48.09
+    },
+    "101-200": {
+      "mae": 12.81,
+      "count": 6.0,
+      "mean_actual": 96.54,
+      "mean_pred": 98.45
+    },
+    "200+": {
+      "mae": 57.73,
+      "count": 5.0,
+      "mean_actual": 210.41,
+      "mean_pred": 205.48
+    }
+  },
+  "cross_season_drift": {
+    "from": "23-24",
+    "to": "24-25",
+    "n_common": 172,
+    "mae": 10.87,
+    "per_role": {
+      "A": {
+        "mae": 22.44,
+        "n": 37
+      },
+      "C": {
+        "mae": 10.86,
+        "n": 51
+      },
+      "D": {
+        "mae": 4.91,
+        "n": 61
+      },
+      "P": {
+        "mae": 8.12,
+        "n": 23
+      }
+    }
+  },
+  "sanity": {
+    "expprice": [
+      -8.9,
+      319.8
+    ],
+    "expstd": [
+      1.0,
+      72.8
+    ]
+  }
+}
