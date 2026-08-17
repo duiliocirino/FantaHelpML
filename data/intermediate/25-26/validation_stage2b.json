@@ -1,0 +1,19 @@
+{
+  "season": "25-26",
+  "rows": 532,
+  "checks": {
+    "columns_exact": true,
+    "no_duplicate_id": true,
+    "expprice_positive": true,
+    "expstd_positive": true,
+    "myrating_range": true
+  },
+  "expprice": [
+    1,
+    290
+  ],
+  "expstd": [
+    1,
+    58
+  ]
+}
